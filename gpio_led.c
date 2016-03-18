@@ -28,8 +28,12 @@ int main(void) {
         printf("GPIO_68 file doesn't exist. Execute \'echo $GPIO > export\' \
                 in /sys/class/gpio as root where $GPIO = 68\n");
         exit(1);
-    } 
-    
+    }
+
+    //Set GPIO 68 as output
+    system("echo out > /sys/class/gpio/gpio68/direction"); 
+    sleep(1);    
+
     while(1) {
         if (cnt % 2 == 0) {
            printf("%u) LED --- ON\n", cnt);
