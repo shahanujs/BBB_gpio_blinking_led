@@ -1,53 +1,93 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<iolib.c>
 #include <unistd.h>
-#include <time.h>
+#include "time.h"
 
-void sig_handler(int signo)
+static int onCount  = 0;
+static int offCount = 0;
+
+static int onTime  = 5; // in secs
+static int offTime = 2; // in secs
+
+
+void printTime()
 {
-    if (signo == SIGINT)
-        printf("\nreceived SIGINT\n");
-    exit(1);
+    time_t t ;
+    struct tm *tmp ;
+    char MY_TIME[32];
+    time( &t );
+
+    //localtime() uses the time pointed by t ,
+    // to fill a tm structure with the
+    // values that represent the
+    // corresponding local time.
+
+    tmp = localtime( &t );
+
+    // using strftime to display time
+    strftime(MY_TIME, sizeof(MY_TIME), "%x - %I:%M%p", tmp);
+
+    printf("%s\n", MY_TIME );
 }
 
-int main(void) {
 
-    int status;
-    unsigned int cnt=0;
-    
-    if (signal(SIGINT, sig_handler) == SIG_ERR) {
-        printf("\ncan't catch SIG Handler\n");
-        exit(1);
-    }
 
-    status = access("/sys/class/gpio/gpio68/value", F_OK );
+int main(void)
 
-    if (status == -1) {
-        // file doesn't exist
-        printf("GPIO_68 file doesn't exist. Execute \'echo $GPIO > export\' \
-                in /sys/class/gpio as root where $GPIO = 68\n");
-        exit(1);
-    }
+{
+        int relay = 13;
+        int discrete = 7;
 
-    //Set GPIO 68 as output
-    system("echo out > /sys/class/gpio/gpio68/direction"); 
-    sleep(1);    
+        iolib_init();
+        iolib_setdir(8, relay, DIR_OUT);
+        iolib_setdir(8, discrete, DIR_IN);
 
-    while(1) {
-        if (cnt % 2 == 0) {
-           printf("%u) LED --- ON\n", cnt);
-           system("echo 1 > /sys/class/gpio/gpio68/value");
-        }
-        else {
-           printf("%u) LED --- OFF\n", cnt);
-           system("echo 0 > /sys/class/gpio/gpio68/value");
-        }
+        printf("Test In Progress\n");
 
-        cnt += 1;
+        // current state
+        int state = -1;
+
+        // 1 hr x 24 hours x days
+        int numLoops = 3600 * 24 * 3;
+
+        int onCountdown = 0;
+
+        while(numLoops--)
+        {
+                if ((is_high(8, discrete)) && (state != 0))
+                {
+                        state = 0;
+                        //printf("Relay is ON.  count = %i\n", ++onCount);
+                        //pin_high(8, relay);
+                        //usleep(1000 * onTime);
+                        printf("--> Relay is OFF. count = %i. ", ++offCount);
+                        printTime();
+						exit(0);
+                        pin_low(8, relay);
+                        onCountdown = 0;
+                }
+                else if ((is_low(8, discrete)) && (state != 1))
+                {
+                        state = 1;
+                        printf("Relay is ON. count = %i\n", ++onCount);
+                        pin_high(8, relay);
+                        //usleep(1000 * offTime);
+                        //state = 0;
+                        //printf("Relay is OFF. count = %i\n", ++offCount);
+                        //usleep(1000 * onTime);
+                        //pin_low(8, relay);
+                }
+                else if ((state == 1) && (onCountdown++ == onTime))
+                {
+                        state = -1;
+                        printf("Relay is OFF. count = %i\n", ++offCount);
+                        pin_low(8, relay);
+                        usleep(1000 * 1000 * offTime);
+                        onCountdown = 0;
+                }
+        //printf("1s..\n");
         sleep(1);
-    }
-
-    return 0;
+        }
+        iolib_free();
 }
-
